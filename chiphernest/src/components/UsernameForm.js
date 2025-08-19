@@ -39,7 +39,7 @@ export default function UsernameForm() {
 
   return (
     <div>
-      <h2>Lag et kult brukernavn</h2>
+      <h2>Lag et Brukernavn</h2>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '400px' }}>
         <input
