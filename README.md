@@ -3,3 +3,17 @@ Meningen med dette programmet er å lagre brukere man har rundt om på nette til
 
 Jeg ønsker at systemet er sikkert og har stort fokus på dette. 
 
+## Skjermbilder
+
+## Username
+![Generator Screenshot](./Screenshots/username.png)
+
+## Password 
+![Generator Screenshot](./Screenshots/passwordgen.png)
+
+## Vault login
+![Vault Screenshot](./Screenshots/Vaultlogin.png)
+
+## Vault
+![Vault Screenshot](./Screenshots/Vault.png)
+
