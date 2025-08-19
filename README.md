@@ -6,7 +6,7 @@ Jeg ønsker at systemet er sikkert og har stort fokus på dette.
 ## Skjermbilder
 
 ## Username
-![Generator Screenshot](./Screenshots/username.png)
+![Generator Screenshot](.//Screenshots/username.png)
 
 ## Password 
 ![Generator Screenshot](./Screenshots/passwordgen.png)
