@@ -1,13 +1,143 @@
+/* src/index.css */
+
+/* ---------- Reset + base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* ---------- Theme tokens ---------- */
+:root {
+  --bg: #0f1216;
+  --bg-elev: #151a20;
+  --bg-elev-2: #1a2028;
+  --text: #e7ecf2;
+  --muted: #a9b3bf;
+  --primary: #8b9eff;        /* indigo-ish */
+  --primary-strong: #6e84ff;
+  --accent: #22d3ee;         /* cyan for highlights */
+  --danger: #ff6b6b;
+  --border: #232a33;
+  --ring: #3b82f6;
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --radius: 14px;
+  --card-pad: 18px;
+  --trans: 160ms ease;
 }
+
+/* Light mode (kan toggles via data-theme på <html>) */
+html[data-theme="light"] {
+  --bg: #f6f7fb;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f1f3f8;
+  --text: #0b1220;
+  --muted: #516178;
+  --primary: #3b82f6;
+  --primary-strong: #2563eb;
+  --accent: #0891b2;
+  --danger: #dc2626;
+  --border: #e5e7eb;
+  --ring: #3b82f6;
+  --shadow: 0 10px 30px rgba(0,0,0,.08);
+}
+
+/* Respekter system-preferanse første gang */
+@media (prefers-color-scheme: light) {
+  :root:not(.forced) {}
+}
+
+/* ---------- Layout helpers ---------- */
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+.stack { display: grid; gap: 16px; }
+.grid-2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+
+/* ---------- Surface / Card ---------- */
+.card {
+  background: linear-gradient(180deg, var(--bg-elev), var(--bg-elev-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--card-pad);
+}
+
+/* ---------- Typography ---------- */
+h1 { font-size: 28px; letter-spacing: .2px; margin: 0 0 10px; }
+h2 { font-size: 22px; margin: 0 0 8px; }
+h3 { font-size: 16px; margin: 16px 0 8px; color: var(--muted); font-weight: 600; }
+
+/* ---------- Controls ---------- */
+input[type="text"], input[type="number"], input[type="password"], input[type="email"], select, textarea {
+  width: 100%;
+  background: #0c0f13;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color var(--trans), box-shadow var(--trans), background var(--trans);
+}
+input::placeholder, textarea::placeholder { color: #7a8593; }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 30%, transparent);
+  background: #0b0e12;
+}
+
+label { color: var(--muted); font-size: 14px; }
+
+button {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--bg-elev-2), var(--bg-elev));
+  color: var(--text);
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: transform var(--trans), background var(--trans), border-color var(--trans), box-shadow var(--trans), opacity var(--trans);
+}
+button:hover { transform: translateY(-1px); border-color: #2a323c; }
+button:active { transform: translateY(0); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--primary), var(--primary-strong));
+  border-color: transparent;
+  color: white;
+}
+.btn-danger {
+  background: linear-gradient(180deg, #ef4444, #dc2626);
+  border-color: transparent;
+  color: white;
+}
+
+/* ---------- Nav ---------- */
+.nav {
+  display: flex; gap: 12px; align-items: center; margin-bottom: 18px;
+}
+.nav a {
+  color: var(--primary); text-decoration: none; padding: 6px 10px; border-radius: 10px;
+  transition: background var(--trans), color var(--trans);
+}
+.nav a:hover { background: rgba(139,158,255,.12); }
+.nav .spacer { flex: 1; }
+
+/* ---------- Lists ---------- */
+ul.clean { list-style: none; padding-left: 0; }
+ul.clean li { padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; background: var(--bg-elev); }
+
+/* ---------- Utilities ---------- */
+.row { display:flex; gap:10px; align-items:center; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+.badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #0e1320; color: var(--accent); border: 1px solid #1f2940; }
+
