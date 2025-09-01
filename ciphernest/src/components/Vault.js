@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { readRawVault, writeRawVault } from '../store/vault';
 import { encryptJson, decryptJson } from '../crypto/crypto';
@@ -13,36 +13,27 @@ function guessDomainFromService(service) {
   return '';
 }
 
-// Enkel passordstyrke (0-4)
-function passwordStrength(pwd) {
-  if (!pwd) return 0;
-  let score = 0;
-  if (pwd.length >= 12) score++;
-  if (pwd.length >= 16) score++;
-  if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
-  if (/\d/.test(pwd)) score++;
-  if (/[^A-Za-z0-9]/.test(pwd)) score++;
-  return Math.min(score, 4);
-}
-
 export default function Vault({ cryptoKey }) {
   const location = useLocation();
 
+  // Data
   const [entries, setEntries] = useState([]);
+
+  // Legg-til/Rediger felter (deles mellom add og edit)
   const [svc, setSvc] = useState('');
   const [domain, setDomain] = useState('');
   const [user, setUser] = useState('');
   const [pwd, setPwd] = useState('');
   const [note, setNote] = useState('');
-  const [tags, setTags] = useState('');
-  const [error, setError] = useState('');
-  const [showPwd, setShowPwd] = useState(false);
 
-  const [query, setQuery] = useState('');
+  // Redigeringsmodus
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState(null);
 
-  // Prefill fra generatoren
+  // UI/state
+  const [error, setError] = useState('');
+  const [q, setQ] = useState(''); // søkespørring
+
+  // Prefill fra generator (navigert med state)
   useEffect(() => {
     const prePwd = location.state?.prefillPassword;
     const preSvc = location.state?.prefillService;
@@ -54,33 +45,54 @@ export default function Vault({ cryptoKey }) {
     }
   }, [location.state]);
 
-  // Last entries fra kryptert vault
+  // Last vault-entries
   useEffect(() => {
     (async () => {
       const raw = readRawVault();
       if (raw?.data && cryptoKey) {
         try {
-          const list = await decryptJson(cryptoKey, raw.data);
-          setEntries(Array.isArray(list) ? list : []);
-          setError('');
+          const payload = await decryptJson(cryptoKey, raw.data);
+          const list = Array.isArray(payload?.entries) ? payload.entries : [];
+          setEntries(list);
         } catch (e) {
           setError('Feil ved dekryptering (feil master-passord?)');
         }
-      } else if (!raw?.data) {
-        setEntries([]);
       }
     })();
   }, [cryptoKey]);
 
-  const save = async (list) => {
+  // Hjelper for å lagre tilbake til vault
+  const persist = async (newEntries) => {
     const raw = readRawVault() || {};
-    const data = await encryptJson(cryptoKey, list);
-    writeRawVault({ ...raw, data });
+    const payload = { ...(await safeDecryptPayload(raw)), entries: newEntries };
+    const data = await encryptJson(cryptoKey, payload);
+    await writeRawVault({ ...raw, data });
   };
 
-  const add = async () => {
-    if (!svc.trim() || !user.trim() || !pwd.trim()) return;
+  const safeDecryptPayload = async (raw) => {
+    try {
+      if (raw?.data && cryptoKey) {
+        const payload = await decryptJson(cryptoKey, raw.data);
+        return typeof payload === 'object' && payload ? payload : {};
+      }
+    } catch {
+      // ignorér – lager nytt payload under
+    }
+    return {};
+  };
+
+  // Legg til ny entry
+  const add = async (ev) => {
+    ev?.preventDefault?.();
+    setError('');
+    if (!svc.trim() || !user.trim() || !pwd) {
+      setError('Fyll ut minst Tjeneste, Brukernavn og Passord.');
+      return;
+    }
+
+    const now = Date.now();
     const next = [
+      ...entries,
       {
         id: crypto.randomUUID(),
         service: svc.trim(),
@@ -88,300 +100,304 @@ export default function Vault({ cryptoKey }) {
         username: user.trim(),
         password: pwd,
         note: note.trim(),
-        tags: tags
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
-        createdAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
+        tags: [],
       },
-      ...entries,
     ];
     setEntries(next);
-    await save(next);
-    setSvc('');
-    setDomain('');
-    setUser('');
-    setPwd('');
-    setNote('');
-    setTags('');
+    await persist(next);
+    // nullstill felter
+    setSvc(''); setDomain(''); setUser(''); setPwd(''); setNote('');
   };
 
+  // Slett entry
   const remove = async (id) => {
     const next = entries.filter((e) => e.id !== id);
     setEntries(next);
-    await save(next);
+    await persist(next);
   };
 
-  const copy = async (text) => {
-    if (!text) return;
-    await navigator.clipboard.writeText(text);
-  };
-
-  const copySequence = async (u, p) => {
-    // Kopier brukernavn -> liten pause -> passord
-    if (!u || !p) return;
-    await navigator.clipboard.writeText(u);
-    await new Promise((r) => setTimeout(r, 300));
-    await navigator.clipboard.writeText(p);
-  };
-
-  const openSite = (d) => {
-    if (!d) return;
-    const url = d.startsWith('http') ? d : `https://${d}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  // Søk/filtrering
-  const filtered = useMemo(() => {
-    if (!query.trim()) return entries;
-    const q = query.trim().toLowerCase();
-    return entries.filter((e) => {
-      const hay = [
-        e.service,
-        e.domain,
-        e.username,
-        e.note,
-        ...(Array.isArray(e.tags) ? e.tags : []),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return hay.includes(q);
-    });
-  }, [entries, query]);
-
-  // Redigering
+  // Begynn redigering
   const beginEdit = (e) => {
     setEditingId(e.id);
-    setEditDraft({
-      service: e.service,
-      domain: e.domain || '',
-      username: e.username,
-      password: e.password,
-      note: e.note || '',
-      tags: (e.tags || []).join(', '),
-    });
+    setSvc(e.service || '');
+    setDomain(e.domain || '');
+    setUser(e.username || '');
+    setPwd(e.password || '');
+    setNote(e.note || '');
+  };
+
+  // Lagre redigering
+  const saveEdit = async () => {
+    if (!editingId) return;
+    const idx = entries.findIndex((x) => x.id === editingId);
+    if (idx === -1) return;
+
+    const updated = {
+      ...entries[idx],
+      service: svc.trim(),
+      domain: domain.trim(),
+      username: user.trim(),
+      password: pwd,
+      note: note.trim(),
+      updatedAt: Date.now(),
+    };
+
+    const next = [...entries];
+    next[idx] = updated;
+    setEntries(next);
+    await persist(next);
+
+    // avslutt redigering og nullstill felter
+    setEditingId(null);
+    setSvc(''); setDomain(''); setUser(''); setPwd(''); setNote('');
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditDraft(null);
+    setSvc(''); setDomain(''); setUser(''); setPwd(''); setNote('');
   };
 
-  const saveEdit = async (id) => {
-    const updated = entries.map((e) =>
-      e.id === id
-        ? {
-            ...e,
-            ...editDraft,
-            service: editDraft.service.trim(),
-            domain: editDraft.domain.trim(),
-            username: editDraft.username.trim(),
-            password: editDraft.password,
-            note: editDraft.note.trim(),
-            tags: editDraft.tags
-              .split(',')
-              .map((t) => t.trim())
-              .filter(Boolean),
-          }
-        : e
-    );
-    setEntries(updated);
-    await save(updated);
-    cancelEdit();
+  // Kopier-helpers
+  const copy = async (text) => {
+    if (text) await navigator.clipboard.writeText(text);
+  };
+  const copySequence = async (username, password) => {
+    if (!username && !password) return;
+    const txt = [username, password].filter(Boolean).join('\n');
+    await navigator.clipboard.writeText(txt);
   };
 
-  const strength = passwordStrength(pwd);
+  // Åpne nettside
+  const openSite = (dom) => {
+    if (!dom) return;
+    const url = dom.startsWith('http') ? dom : `https://${dom}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  // Filtrering (søk)
+  const normalizedQ = q.trim().toLowerCase();
+  const filtered = normalizedQ
+    ? entries.filter((e) => {
+        const hay = [
+          e.service,
+          e.domain,
+          e.username,
+          e.note,
+          ...(Array.isArray(e.tags) ? e.tags : []),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(normalizedQ);
+      })
+    : entries;
 
   return (
-    <div className="stack">
-      <h2>🔐 Mitt Hvelv</h2>
+    <div className="container stack">
+      <div className="card stack" style={{ maxWidth: 900 }}>
+        <h2 className="card-title">🔐 Mitt Hvelv</h2>
 
-      {/* Søk og hurtigoversikt */}
-      <div className="card stack">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <input
-            type="text"
-            placeholder="Søk (tjeneste, domene, brukernavn, tag …)"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <span className="badge">{filtered.length} treff</span>
-        </div>
-      </div>
-
-      {/* Legg til konto */}
-      <div className="card stack">
-        <h3>➕ Legg til konto</h3>
+        {/* Søk */}
         <div className="grid-2">
-          <input
-            type="text"
-            placeholder="Tjeneste (eks: GitHub)"
-            value={svc}
-            onChange={(e) => setSvc(e.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Domene (eks: github.com)"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-          />
-        </div>
-        <div className="grid-2">
-          <input
-            type="text"
-            placeholder="Brukernavn"
-            value={user}
-            onChange={(e) => setUser(e.target.value)}
-          />
-          <div className="row" style={{ gap: 8 }}>
+          <label>
+            
             <input
-              type={showPwd ? 'text' : 'password'}
-              placeholder="Passord"
-              value={pwd}
-              onChange={(e) => setPwd(e.target.value)}
+              type="text"
+              placeholder="Søk i tjeneste, domene, brukernavn, notat…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
             />
-            <button type="button" onClick={() => setShowPwd((s) => !s)}>
-              {showPwd ? 'Skjul' : 'Vis'}
+          </label>
+          <div />
+        </div>
+
+        {/* Legg til / Rediger */}
+        <form
+          className="card stack"
+          style={{ background: 'var(--bg-elev-2)' }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            editingId ? saveEdit() : add();
+          }}
+        >
+          <div className="card-title">
+            <span className="kicker">{editingId ? 'Rediger konto' : 'Legg til konto'}</span>
+          </div>
+
+          <div className="grid-2">
+            <label>
+              Tjeneste
+              <input
+                type="text"
+                placeholder="Eks: GitHub"
+                value={svc}
+                onChange={(e) => {
+                  setSvc(e.target.value);
+                  if (!domain && e.target.value) {
+                    const auto = guessDomainFromService(e.target.value);
+                    if (auto) setDomain(auto);
+                  }
+                }}
+              />
+            </label>
+            <label>
+              Domene
+              <input
+                type="text"
+                placeholder="Eks: github.com"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="grid-2">
+            <label>
+              Brukernavn
+              <input
+                type="text"
+                placeholder="Din innloggings-ID"
+                value={user}
+                onChange={(e) => setUser(e.target.value)}
+              />
+            </label>
+            <label>
+              Passord
+              <input
+                type="text"
+                placeholder="••••••••"
+                value={pwd}
+                onChange={(e) => setPwd(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <label>
+            Notat (valgfritt)
+            <textarea
+              rows={3}
+              placeholder="Ekstra info, backup-koder, e.l."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </label>
+
+          {error && <div style={{ color: 'salmon' }}>{error}</div>}
+
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn-primary" type="submit">
+              {editingId ? '💾 Lagre endringer' : '➕ Legg til'}
             </button>
+            {editingId && (
+              <button type="button" onClick={cancelEdit}>
+                Avbryt
+              </button>
+            )}
           </div>
-        </div>
-        <input
-          type="text"
-          placeholder="Tags (kommaseparert: jobb, privat …)"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Notat (valgfritt)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        {/* Styrkeindikator */}
-        <div className="row" style={{ alignItems: 'center' }}>
-          <div style={{ width: 120, height: 8, background: '#0c0f13', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
-            <div
-              style={{
-                width: `${(strength / 4) * 100}%`,
-                height: '100%',
-                background:
-                  strength >= 3 ? 'linear-gradient(90deg,#16a34a,#22c55e)' :
-                  strength === 2 ? 'linear-gradient(90deg,#eab308,#f59e0b)' :
-                  'linear-gradient(90deg,#ef4444,#f87171)',
-              }}
-            />
-          </div>
-          <span style={{ marginLeft: 8, color: 'var(--muted)' }}>
-            {['svakt','ok','middels','sterkt','meget sterkt'][strength]}
-          </span>
-        </div>
+        </form>
 
-        <div className="row">
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={add}
-            disabled={!svc.trim() || !user.trim() || !pwd.trim()}
-          >
-            💾 Lagre i Hvelv
-          </button>
-        </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
+        {/* Liste over kontoer */}
+        <h3>📂 Lagrede kontoer</h3>
+        {filtered.length === 0 ? (
+          <p className="muted">Ingen kontoer {q ? 'matcher søket.' : 'lagret enda.'}</p>
+        ) : (
+          <ul className="list">
+            {filtered.map((e) => (
+              <li key={e.id} className="item">
+                {editingId === e.id ? (
+                  // Sikkerhet: vi viser ikke inline-redigering for den som allerede er i toppskjema.
+                  // Bruk toppskjemaet (over) i stedet. Her viser vi bare en info.
+                  <div className="muted">
+                    Redigerer denne i skjemaet over. Fullfør eller avbryt der.
+                  </div>
+                ) : (
+                  <>
+                    <div className="row-between">
+                      <div className="row" style={{ gap: 10 }}>
+                        <b className="truncate">{e.service || 'Uten navn'}</b>
+                        {e.domain && <span className="badge">{e.domain}</span>}
+                        {Array.isArray(e.tags) && e.tags.length > 0 && (
+                          <span className="badge">{e.tags.join(' · ')}</span>
+                        )}
+                      </div>
+                      <div className="meta">
+                        {e.createdAt && (
+                          <span className="tag">
+                            Opprettet {new Date(e.createdAt).toLocaleDateString()}
+                          </span>
+                        )}
+                        {e.updatedAt && e.updatedAt !== e.createdAt && (
+                          <span className="tag">
+                            Endret {new Date(e.updatedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="row" style={{ gap: 10 }}>
+                      <span>👤</span>
+                      <span className="mono truncate" title={e.username}>
+                        {e.username || '—'}
+                      </span>
+                    </div>
+
+                    {e.note && <div className="muted">📝 {e.note}</div>}
+
+                    <div className="row-between" style={{ flexWrap: 'wrap', gap: 8 }}>
+                      <div className="row" style={{ gap: 8 }}>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() => copy(e.username)}
+                          title="Kopier brukernavn"
+                        >
+                          📋 Bruker
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() => copy(e.password)}
+                          title="Kopier passord"
+                        >
+                          📋 Pass
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() => copySequence(e.username, e.password)}
+                          title="Kopier brukernavn + passord"
+                        >
+                          📋 Begge
+                        </button>
+                        {e.domain && (
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            onClick={() => openSite(e.domain)}
+                            title="Åpne nettsted"
+                          >
+                            🌐 Åpne
+                          </button>
+                        )}
+                      </div>
+                      <div className="row" style={{ gap: 8 }}>
+                        <button type="button" className="btn-ghost" onClick={() => beginEdit(e)}>
+                          ✏️ Rediger
+                        </button>
+                        <button type="button" className="btn-danger" onClick={() => remove(e.id)}>
+                          🗑 Slett
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-
-      {/* Liste over kontoer */}
-      <h3>📂 Lagrede kontoer</h3>
-      {filtered.length === 0 ? (
-        <p className="muted">Ingen kontoer funnet.</p>
-      ) : (
-        <ul className="clean">
-          {filtered.map((e) => (
-            <li key={e.id} className="card stack">
-              {editingId === e.id ? (
-                <>
-                  <div className="grid-2">
-                    <input
-                      value={editDraft.service}
-                      onChange={(ev) =>
-                        setEditDraft((d) => ({ ...d, service: ev.target.value }))
-                      }
-                      placeholder="Tjeneste"
-                    />
-                    <input
-                      value={editDraft.domain}
-                      onChange={(ev) =>
-                        setEditDraft((d) => ({ ...d, domain: ev.target.value }))
-                      }
-                      placeholder="Domene"
-                    />
-                  </div>
-                  <div className="grid-2">
-                    <input
-                      value={editDraft.username}
-                      onChange={(ev) =>
-                        setEditDraft((d) => ({ ...d, username: ev.target.value }))
-                      }
-                      placeholder="Brukernavn"
-                    />
-                    <input
-                      value={editDraft.password}
-                      onChange={(ev) =>
-                        setEditDraft((d) => ({ ...d, password: ev.target.value }))
-                      }
-                      placeholder="Passord"
-                      type="text"
-                    />
-                  </div>
-                  <input
-                    value={editDraft.tags}
-                    onChange={(ev) =>
-                      setEditDraft((d) => ({ ...d, tags: ev.target.value }))
-                    }
-                    placeholder="Tags (kommaseparert)"
-                  />
-                  <input
-                    value={editDraft.note}
-                    onChange={(ev) =>
-                      setEditDraft((d) => ({ ...d, note: ev.target.value }))
-                    }
-                    placeholder="Notat"
-                  />
-                  <div className="row">
-                    <button type="button" className="btn-primary" onClick={() => saveEdit(e.id)}>
-                      ✅ Lagre
-                    </button>
-                    <button type="button" onClick={cancelEdit}>
-                      ✖ Avbryt
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="row">
-                    <b>{e.service}</b>
-                    {e.domain && <span className="badge">{e.domain}</span>}
-                    {Array.isArray(e.tags) && e.tags.length > 0 && (
-                      <span className="badge">{e.tags.join(' · ')}</span>
-                    )}
-                  </div>
-                  <div>👤 <span className="mono">{e.username}</span></div>
-                  {e.note && <div className="muted">📝 {e.note}</div>}
-                  <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                    <button type="button" onClick={() => copy(e.username)}>📋 Kopier bruker</button>
-                    <button type="button" onClick={() => copy(e.password)}>📋 Kopier pass</button>
-                    <button type="button" onClick={() => copySequence(e.username, e.password)}>📋 Kopier begge</button>
-                    {e.domain && <button type="button" onClick={() => openSite(e.domain)}>🌐 Åpne side</button>}
-                    <button type="button" onClick={() => beginEdit(e)}>✏️ Rediger</button>
-                    <button type="button" className="btn-danger" onClick={() => remove(e.id)}>🗑 Slett</button>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
-

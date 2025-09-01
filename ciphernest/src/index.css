@@ -69,6 +69,10 @@ html[data-theme="light"] {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: var(--card-pad);
+  
+  width: 100%; /* gjør at kort fyller container */
+  max-width: 100%; /* ingen intern max */
+
 }
 
 /* ---------- Typography ---------- */
@@ -152,5 +156,75 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   place-items: center; /* midt horisontalt + vertikalt */
   padding: 20px;
 }
+
+/* ---------- Typo & hierarki ---------- */
+h1 { font-size: 30px; font-weight: 700; letter-spacing: .2px; }
+h2 { font-size: 24px; font-weight: 700; }
+h3 { font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+
+/* Kicker (liten overlinje over en tittel) */
+.kicker { font-size: 12px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); }
+
+/* Sekundærtekst */
+.muted { color: var(--muted); }
+
+/* ---------- Cards: mer luft og separasjon ---------- */
+.card { padding: clamp(16px, 3vw, 22px); }
+.card .card-title { display:flex; align-items:center; gap:10px; }
+.card .card-title .eyebrow { font-size:12px; color: var(--muted); }
+
+/* ---------- Badges / tags ---------- */
+.badge { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #0e1320; color: var(--accent); border: 1px solid #1f2940; }
+.tag { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px dashed var(--border); color: var(--muted); }
+
+/* ---------- Buttons: varianter ---------- */
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.btn-ghost:hover { color: var(--text); background: rgba(139,158,255,.10); }
+
+.icon-btn {
+  display:inline-flex; align-items:center; gap:8px;
+  padding: 8px 10px; border-radius: 10px;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 35%, transparent);
+}
+
+/* ---------- Lists (item-layout) ---------- */
+.list { list-style:none; padding:0; margin:0; display:grid; gap:10px; }
+.list .item {
+  display:grid; gap:8px;
+  padding:14px; background: var(--bg-elev);
+  border:1px solid var(--border); border-radius:12px;
+}
+.item .row-between { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.item .meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+/* Truncate help */
+.truncate { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Tooltip (superenkel) */
+.tooltip { position:relative; }
+.tooltip:hover::after {
+  content: attr(data-tip);
+  position:absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  font-size:12px; color:#cbd5e1; background:#0b0f15; border:1px solid #1f2632;
+  padding:6px 8px; border-radius:8px; white-space:nowrap; z-index:20;
+}
+
+/* Reduce motion (små mikrointeraksjoner) */
+@media (prefers-reduced-motion:no-preference) {
+  button, a { transition: transform var(--trans), opacity var(--trans), background var(--trans), border-color var(--trans), color var(--trans); }
+  .item:hover { transform: translateY(-1px); }
+}
+
+/* Sentral side-layout (sørg for at kortet ikke “klistrer” til toppen) */
+.center-page { min-height: calc(100vh - 120px); display:grid; place-items:center; padding: 30px 16px; }
+
 
 

@@ -21,6 +21,7 @@ export default function App() {
 
   const handleUnlocked = ({ key, }) => {
     setCryptoKey(key);
+    navigate('/vault', { replace: true });
     resetTimer();
   }
 
@@ -51,7 +52,7 @@ export default function App() {
     idleTimerRef.current = setTimeout(() => {
       // Sjekk at vi fremdeles er innlogget før vi låser
       if (cryptoKey) hardLogout();
-    }, TIMEOUT_MIN * 20 * 1000);
+    }, TIMEOUT_MIN * 60 * 1000);
   }, [cryptoKey, hardLogout]);
   
   useEffect(() => { resetTimer(); }, [resetTimer]);
@@ -124,7 +125,13 @@ useEffect(() => {
       </nav>
 
       <div className="container">
+
         <Routes>
+        {/* Default: gå til vault hvis innlogget, ellers login */}
+          <Route path="/" element={
+            <Navigate to={cryptoKey ? "/vault" : "/login"} replace />
+          }/>
+          
           {/* Login er alltid tilgjengelig */}
           <Route path="/login" element={<LoginPage onUnlocked={handleUnlocked} />} />
 

@@ -139,6 +139,7 @@ export default function MfaSetup({ cryptoKey }) {
 
           <div className="row">
             <button className="btn-primary" type="button" onClick={rotate}>🔁 Generer nye koder</button>
+            
             <button className="btn-danger"  type="button" onClick={disable}>🗑 Deaktiver 2FA</button>
           </div>
 
