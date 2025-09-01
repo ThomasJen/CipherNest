@@ -123,21 +123,34 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ---------- Nav ---------- */
 .nav {
-  display: flex; gap: 12px; align-items: center; margin-bottom: 18px;
+  height: 56px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+  position: sticky; /* henger fast øverst */
+  top: 0;
+  z-index: 10;
+  margin-bottom: 0; /* fjern gamle margin */
 }
 .nav a {
-  color: var(--primary); text-decoration: none; padding: 6px 10px; border-radius: 10px;
+  color: var(--primary);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 10px;
   transition: background var(--trans), color var(--trans);
 }
 .nav a:hover { background: rgba(139,158,255,.12); }
 .nav .spacer { flex: 1; }
 
-/* ---------- Lists ---------- */
-ul.clean { list-style: none; padding-left: 0; }
-ul.clean li { padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; background: var(--bg-elev); }
+/* ---------- Centered page helper ---------- */
+.center-page {
+  min-height: calc(100vh - 56px); /* minus nav-høyde */
+  display: grid;
+  place-items: center; /* midt horisontalt + vertikalt */
+  padding: 20px;
+}
 
-/* ---------- Utilities ---------- */
-.row { display:flex; gap:10px; align-items:center; }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-.badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #0e1320; color: var(--accent); border: 1px solid #1f2940; }
 

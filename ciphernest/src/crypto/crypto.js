@@ -2,22 +2,16 @@
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-async function importKeyFromPassword(password) {
-  return crypto.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
-}
-
-export async function deriveAesKey(password, saltB64, iterations = 200_000) {
-  const baseKey = await importKeyFromPassword(password);
-  const salt = saltB64 ? Uint8Array.from(atob(saltB64), c => c.charCodeAt(0)) : crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+export async function deriveKeyFromPassword(password, saltBytes, iterations=200000) {
+  const enc = new TextEncoder();
+  const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: saltBytes, iterations, hash: 'SHA-256' },
     baseKey,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt','decrypt']
   );
-  const saltStr = saltB64 || btoa(String.fromCharCode(...salt));
-  return { key, saltB64: saltStr };
 }
 
 export async function encryptJson(key, data) {
